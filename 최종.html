@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>1105 이서정</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      padding: 30px;
+      background-color: #f7f7f7;
+    }
+    input, button {
+      margin: 5px;
+      padding: 5px;
+      font-size: 16px;
+    }
+    .section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    h2 {
+      color: #222;
+    }
+    .log {
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        font-family: 'Courier New', 'Fira Code', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        padding: 15px;
+        margin-top: 15px;
+        border-radius: 6px;
+        white-space: pre-wrap;
+        color: #222;
+        }
+
+  </style>
+</head>
+<body>
+
+  <header style="text-align: center; margin-bottom: 40px;">
+    <h1 style="font-size: 36px; margin: 0;">Hill 암호</h1>
+    <p style="font-size: 18px; color: #555;">1105 이서정</p>
+  </header>
+
+  <div class="section">
+    <h2>🔐 Hill 암호화 (한글)</h2>
+    <input type="text" id="plaintext" placeholder="평문 입력 (예: 안녕)">
+    <br>
+    키 행렬 (2×2):<br>
+    <input type="number" id="k00"> <input type="number" id="k01"><br>
+    <input type="number" id="k10"> <input type="number" id="k11"><br>
+    <button onclick="encrypt()">암호화하기</button>
+    <p>
+        <span id="ciphertextResult"></span>
+        <button onclick="copyCiphertext()">복사하기</button>
+    </p>
+    <div class="log" id="encryptLog"></div>
+  </div>
+
+  <div class="section">
+    <h2>🔓 Hill 복호화 (한글)</h2>
+    <input type="text" id="ciphertext" placeholder="암호문 입력">
+    <br>
+    키 행렬 (2×2):<br>
+    <input type="number" id="dk00"> <input type="number" id="dk01"><br>
+    <input type="number" id="dk10"> <input type="number" id="dk11"><br>
+    <button onclick="decrypt()">복호화하기</button>
+    <p id="plaintextResult"></p>
+    <div class="log" id="decryptLog"></div>
+  </div>
+
+  <script>
+    const charset = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ*';
+    const charMap = {};
+    charset.split('').forEach((ch, i) => { charMap[ch] = i; });
+    const indexToChar = i => (i >= 0 && i < charset.length) ? charset[i] : '?';
+
+    function mod(n, m) {
+      return ((n % m) + m) % m;
+    }
+
+    function gcd(a, b) {
+      while (b !== 0) {
+        let t = b;
+        b = a % b;
+        a = t;
+      }
+      return a;
+    }
+
+    function modularInverse(a, m) {
+      for (let i = 1; i < m; i++) {
+        if (mod(a * i, m) === 1) return i;
+      }
+      return null;
+    }
+
+    function invertMatrix2x2(m, modn) {
+      const det = mod(m[0][0]*m[1][1] - m[0][1]*m[1][0], modn);
+      if (gcd(det, modn) !== 1) return null;
+      const detInv = modularInverse(det, modn);
+      if (detInv === null) return null;
+      return [
+        [mod(m[1][1] * detInv, modn), mod(-m[0][1] * detInv, modn)],
+        [mod(-m[1][0] * detInv, modn), mod(m[0][0] * detInv, modn)]
+      ];
+    }
+
+    function getMatrix(prefix) {
+      const get = id => {
+        const val = parseInt(document.getElementById(id).value);
+        return isNaN(val) ? 0 : val;
+      };
+      return [
+        [get(prefix + '00'), get(prefix + '01')],
+        [get(prefix + '10'), get(prefix + '11')]
+      ];
+    }
+
+    function hangulToJamo(str) {
+        const result = [];
+        for (let ch of str) {
+        const code = ch.charCodeAt(0) - 44032;
+        if (code < 0 || code > 11171) continue;
+        const chosung = Math.floor(code / 588);
+        const jungsung = Math.floor((code % 588) / 28);
+        const jongsung = code % 28;
+        const CHOSUNG = ['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+        const JUNGSUNG = ['ㅏ','ㅐ','ㅑ','ㅒ','ㅓ','ㅔ','ㅕ','ㅖ','ㅗ','ㅘ','ㅙ','ㅚ','ㅛ','ㅜ','ㅝ','ㅞ','ㅟ','ㅠ','ㅡ','ㅢ','ㅣ'];
+        const JONGSUNG = ['', 'ㄱ','ㄲ','ㄳ','ㄴ','ㄵ','ㄶ','ㄷ','ㄹ','ㄺ','ㄻ','ㄼ','ㄽ','ㄾ','ㄿ','ㅀ','ㅁ','ㅂ','ㅄ','ㅅ','ㅆ','ㅇ','ㅈ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
+        result.push(CHOSUNG[chosung]);
+        result.push(JUNGSUNG[jungsung]);
+        if (jongsung !== 0) result.push(JONGSUNG[jongsung]);
+        }
+    return result;
+    }
+
+    function encrypt() {
+      const log = [];
+      const raw = document.getElementById('plaintext').value;
+      const jamoText = hangulToJamo(raw);
+      const vec = jamoText.map(ch => {
+        if (!(ch in charMap)) return -1;
+        return charMap[ch];
+      });
+    if (vec.includes(-1)) {
+        document.getElementById('ciphertextResult').innerText = '❗ 지원하지 않는 문자가 있습니다.';
+        return;
+    }
+
+    // ✅ 패딩은 짝수 맞추기 위해 추가해야 함 (암호화 전용)
+    if (vec.length % 2 !== 0) {
+        vec.push(charMap['*'])
+        log.push('[패딩] 홀수 길이 → * 추가됨');
+    }
+
+      const key = getMatrix('k');
+      const det = mod(key[0][0]*key[1][1] - key[0][1]*key[1][0], charset.length);
+      if (gcd(det, charset.length) !== 1) {
+        document.getElementById('ciphertextResult').innerText = '❗ 암호화 불가: 키 행렬식이 문자 개수와 서로소가 아닙니다.';
+        return;
+      }
+
+      const result = [];
+      for (let i = 0; i < vec.length; i += 2) {
+        const p = [vec[i], vec[i+1]];
+        const c = [
+          mod(key[0][0]*p[0] + key[0][1]*p[1], charset.length),
+          mod(key[1][0]*p[0] + key[1][1]*p[1], charset.length)
+        ];
+        result.push(...c);
+        log.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        log.push('');
+        log.push(`[ 입력 문자쌍 ] ${indexToChar(p[0])}${indexToChar(p[1])}`);
+        log.push(`- 문자 인덱스: ${indexToChar(p[0])}=${p[0]}, ${indexToChar(p[1])}=${p[1]}`);
+        log.push(`- 평문 벡터: [ ${p[0].toString().padStart(2)} ]`);
+        log.push(`            [ ${p[1].toString().padStart(2)} ]`);
+        log.push('');
+        log.push(` - 행렬곱`);
+        log.push(`[ ${key[0][0]}  ${key[0][1]} ]     [ ${p[0]} ]   =   [ ${key[0][0]}×${p[0]} + ${key[0][1]}×${p[1]} = ${key[0][0]*p[0] + key[0][1]*p[1]} ]   → mod ${charset.length} = ${c[0]} → ${indexToChar(c[0])}`);
+        log.push(`[ ${key[1][0]}  ${key[1][1]} ]  ×  [ ${p[1]} ]       [ ${key[1][0]}×${p[0]} + ${key[1][1]}×${p[1]} = ${key[1][0]*p[0] + key[1][1]*p[1]} ]  → mod ${charset.length} = ${c[1]} → ${indexToChar(c[1])}`);
+        log.push('');
+        log.push(`[ 암호화된 문자쌍 ] ${indexToChar(c[0])}${indexToChar(c[1])}`);
+        log.push('');
+      }
+      const cipherText = result.map(indexToChar).join('');
+      document.getElementById('ciphertextResult').innerText = '암호문: ' + cipherText;
+      document.getElementById('encryptLog').innerText = log.join('\n');
+    }
+
+    function decrypt() {
+      const log = [];
+      const input = document.getElementById('ciphertext').value;
+      const vec = input.split('').map(ch => {
+        if (!(ch in charMap)) return -1;
+        return charMap[ch];
+      });
+      if (vec.includes(-1)) {
+        document.getElementById('plaintextResult').innerText = '❗ 지원하지 않는 문자가 있습니다.';
+        return;
+      }
+      if (vec.length % 2 !== 0) {
+        document.getElementById('plaintextResult').innerText = '❗ 짝수 개 문자 입력 필요';
+        return;
+      }
+      const key = getMatrix('dk');
+      const inv = invertMatrix2x2(key, charset.length);
+      const det = mod(key[0][0]*key[1][1] - key[0][1]*key[1][0], charset.length);
+      const detInv = modularInverse(det, charset.length);
+
+      log.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      log.push('');
+      log.push('[ 행렬식(det) ]');
+      log.push(`det = (${key[0][0]}×${key[1][1]})−(${key[0][1]}×${key[1][0]}) = ${key[0][0]*key[1][1]}−${key[0][1]*key[1][0]} = ${key[0][0]*key[1][1] - key[0][1]*key[1][0]}`);
+      log.push('');
+      log.push('[ 키 행렬의 역행렬 ]');
+      log.push(`            [ ${key[1][1]} ${-key[0][1]} ]      [ ${key[1][1]*detInv} ${-key[0][1]*detInv} ]   → mod ${charset.length} = [ ${mod(key[1][1]*detInv, charset.length)} ${mod(-key[0][1]*detInv, charset.length)} ]`);
+      log.push(`A^-1 = ${detInv} x [ ${-key[1][0]} ${key[0][0]} ]  =  [ ${-key[1][0]*detInv} ${key[0][0]*detInv} ]  → mod ${charset.length} = [ ${mod(-key[1][0]*detInv, charset.length)} ${mod(key[0][0]*detInv, charset.length)} ]`);
+      log.push('');
+      log.push('');
+      if (!inv) {
+        document.getElementById('plaintextResult').innerText = '❗ 복호화 불가: 역행렬 없음';
+        return;
+      }
+      const result = [];
+      for (let i = 0; i < vec.length; i += 2) {
+        const c = [vec[i], vec[i+1]];
+  
+        // ✅ 변수 선언  추가
+        const x = c[0], y = c[1];
+        const k00 = inv[0][0], k01 = inv[0][1];
+        const k10 = inv[1][0], k11 = inv[1][1];
+
+        const r0 = k00 * x + k01 * y;
+        const r1 = k10 * x + k11 * y;
+        const m0 = mod(r0, charset.length);
+        const m1 = mod(r1, charset.length);
+        result.push(m0, m1);
+
+        // ▶ 아래는 우리가 맞춘 포맷
+        log.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        log.push('');
+        log.push(`[ 암호 문자쌍 ] ${indexToChar(x)}${indexToChar(y)}`);
+        log.push(`- 문자 인덱스: ${indexToChar(x)}=${x}, ${indexToChar(y)}=${y}`);
+        log.push(`- 평문 벡터: [ ${x.toString().padStart(2)} ]`);
+        log.push(`            [ ${y.toString().padStart(2)} ]`);
+        log.push('');
+        log.push(` - 역행렬 곱`);
+        log.push(`[ ${k00}  ${k01} ]     [ ${x} ]   =   [ ${k00}×${x} + ${k01}×${y} = ${r0} ]   → mod ${charset.length} = ${m0} → ${indexToChar(m0)}`);
+        log.push(`[ ${k10}  ${k11} ]  ×  [ ${y} ]       [ ${k10}×${x} + ${k11}×${y} = ${r1} ]  → mod ${charset.length} = ${m1} → ${indexToChar(m1)}`);
+        log.push('');
+        log.push(`[ 복호화된 문자쌍 ] ${indexToChar(m0)}${indexToChar(m1)}`);
+        log.push('');
+      }
+
+      const plainText = result.map(indexToChar).join('').replace(/\*+$/, '');
+      document.getElementById('plaintextResult').innerText = '복호문: ' + plainText;
+      document.getElementById('decryptLog').innerText = log.join('\n');
+    }
+
+    function copyCiphertext() {
+        const text = document.getElementById('ciphertextResult').innerText.replace(/^암호문:\s*/, '');
+        if (!text) return alert('복사할 암호문이 없습니다.');
+        navigator.clipboard.writeText(text).then(() => {
+            alert('암호문이 클립보드에 복사되었습니다! 🎉');
+        }).catch(err => {
+            alert('복사 실패 😥: ' + err);
+        });
+    }
+
+  </script>
+
+</body>
+</html>
