@@ -48,11 +48,11 @@
 
   <div class="section">
     <h2>🔐 Hill 암호화 (한글)</h2>
-    <input type="text" id="plaintext" placeholder="평문 입력 (예: 안녕)">
+    <input type="text" id="plaintext" placeholder="한글 입력 (예: 으악 살려줘)">
     <br>
     키 행렬 (2×2):<br>
-    <input type="number" id="k00"> <input type="number" id="k01"><br>
-    <input type="number" id="k10"> <input type="number" id="k11"><br>
+    <input type="number" id="k00" placeholder = "1"> <input type="number" id="k01" placeholder = "2"><br>
+    <input type="number" id="k10" placeholder = "3"> <input type="number" id="k11" placeholder = "4"><br>
     <button onclick="encrypt()">암호화하기</button>
     <p>
         <span id="ciphertextResult"></span>
@@ -66,15 +66,15 @@
     <input type="text" id="ciphertext" placeholder="암호문 입력">
     <br>
     키 행렬 (2×2):<br>
-    <input type="number" id="dk00"> <input type="number" id="dk01"><br>
-    <input type="number" id="dk10"> <input type="number" id="dk11"><br>
+    <input type="number" id="dk00" placeholder = "1"> <input type="number" id="dk01" placeholder = "2"><br>
+    <input type="number" id="dk10" placeholder = "3"> <input type="number" id="dk11" placeholder = "4"><br>
     <button onclick="decrypt()">복호화하기</button>
     <p id="plaintextResult"></p>
     <div class="log" id="decryptLog"></div>
   </div>
 
   <script>
-    const charset = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ*';
+    const charset = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ*ㄳㄵㄶㄺㄻㄼㄽㄾㄿㅀㅄ ';
     const charMap = {};
     charset.split('').forEach((ch, i) => { charMap[ch] = i; });
     const indexToChar = i => (i >= 0 && i < charset.length) ? charset[i] : '?';
@@ -164,16 +164,22 @@ const vec = jamoText.map(ch => {
         return;
     }
 
-    // ✅ 패딩은 짝수 맞추기 위해 추가해야 함 (암호화 전용)
+    // 패딩은 짝수 맞추기 위해 추가해야 함 (암호화 전용)
     if (vec.length % 2 !== 0) {
         vec.push(charMap['*'])
         log.push('[패딩] 홀수 길이 → * 추가됨');
     }
 
       const key = getMatrix('k');
-      const det = mod(key[0][0]*key[1][1] - key[0][1]*key[1][0], charset.length);
+      const rawDet = key[0][0]*key[1][1] - key[0][1]*key[1][0];
+      const det = mod(rawDet, charset.length);
       if (gcd(det, charset.length) !== 1) {
-        document.getElementById('ciphertextResult').innerText = '❗ 암호화 불가: 키 행렬식이 문자 개수와 서로소가 아닙니다.';
+        document.getElementById('ciphertextResult').innerText = `❗ 암호화 불가: 행렬식(${rawDet}) = ${det} → ${charset.length}과 서로소가 아닙니다.`;
+        return;
+      }
+      const detInv = modularInverse(det, charset.length);
+      if (detInv === null) {
+        document.getElementById('ciphertextResult').innerText = `❗ 암호화 불가: 행렬식 ${det}의 모듈러 역원이 존재하지 않습니다.`;
         return;
       }
 
@@ -242,7 +248,7 @@ const vec = jamoText.map(ch => {
       for (let i = 0; i < vec.length; i += 2) {
         const c = [vec[i], vec[i+1]];
   
-        // ✅ 변수 선언  추가
+        // 변수 선언  추가
         const x = c[0], y = c[1];
         const k00 = inv[0][0], k01 = inv[0][1];
         const k10 = inv[1][0], k11 = inv[1][1];
@@ -253,7 +259,7 @@ const vec = jamoText.map(ch => {
         const m1 = mod(r1, charset.length);
         result.push(m0, m1);
 
-        // ▶ 아래는 우리가 맞춘 포맷
+        // 복호화 과정 설명
         log.push('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         log.push('');
         log.push(`[ 암호 문자쌍 ] ${indexToChar(x)}${indexToChar(y)}`);
@@ -269,7 +275,8 @@ const vec = jamoText.map(ch => {
         log.push('');
       }
 
-      const plainText = result.map(indexToChar).join('').replace(/\*+$/, '');
+      const rawPlain = result.map(indexToChar).join('');
+      const plainText = rawPlain.replace(/\*+$/, ''); // *만 제거, 공백 유지
       document.getElementById('plaintextResult').innerText = '복호문: ' + plainText;
       document.getElementById('decryptLog').innerText = log.join('\n');
     }
