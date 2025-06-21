@@ -141,12 +141,24 @@
 
     function encrypt() {
       const log = [];
-      const raw = document.getElementById('plaintext').value;
-      const jamoText = hangulToJamo(raw);
-      const vec = jamoText.map(ch => {
-        if (!(ch in charMap)) return -1;
-        return charMap[ch];
-      });
+      const raw = document.getElementById('plaintext').value.split('');
+      let jamoText = [];
+
+      // 한글 완성형일 경우 분해, 자모만 있을 경우 그대로 사용
+      for (let ch of raw) {
+        const code = ch.charCodeAt(0) - 44032;
+        if (code >= 0 && code <= 11171) {
+            jamoText.push(...hangulToJamo(ch));
+        } else {
+            jamoText.push(ch);
+        }
+      }
+
+const vec = jamoText.map(ch => {
+  if (!(ch in charMap)) return -1;
+  return charMap[ch];
+});
+
     if (vec.includes(-1)) {
         document.getElementById('ciphertextResult').innerText = '❗ 지원하지 않는 문자가 있습니다.';
         return;
